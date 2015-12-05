@@ -9,6 +9,7 @@ import (
 
 const (
 	defaultExpDelta      = time.Hour * 100
+	defaultAuthPrefix    = "JWT"
 	defaultUsernameField = "username"
 	defaultPasswordField = "password"
 	defaultIdentityKey   = "identity"
@@ -23,11 +24,12 @@ type (
 	IdentityHandler func(identity interface{}) interface{}
 
 	Config struct {
-		JwtExpirationDelta time.Duration
 		secret             string
+		JwtExpirationDelta time.Duration
 		UsernameField      string
 		PasswordField      string
 		IdentityKey        string
+		AuthPrefix         string
 	}
 
 	Jwt struct {
@@ -52,12 +54,35 @@ func NewConfig(secret string) Config {
 		defaultUsernameField,
 		defaultPasswordField,
 		defaultIdentityKey,
+		defaultAuthPrefix,
 	}
 }
 
 func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 	return func(c *echo.Context) error {
+		if (c.Request().Header.Get(echo.Upgrade)) == echo.WebSocket {
+			return nil
+		}
 
+		auth := c.Request().Header.Get(echo.Authorization)
+		tokenString, err := getAuthTokenFromHeader(auth, jwt.config.AuthPrefix)
+
+		if err != nil {
+			// TODO: header empty or invalid
+		}
+
+		token, err := decodeToken(jwt.config.secret, tokenMethod, tokenString)
+
+		if err != nil {
+			// TODO: error token not valid
+		}
+
+		if getExpiredFromClaims(token.Claims, expiredKey) < time.Now().Unix() {
+			// TODO: error token expire
+		}
+
+		c.Set(jwt.config.IdentityKey, jwt.identity(token.Claims[identityKey]))
+		return nil
 	}
 }
 
