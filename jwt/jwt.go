@@ -1,6 +1,8 @@
 package jwt
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	gojwt "github.com/dgrijalva/jwt-go"
@@ -43,10 +45,6 @@ func NewJwt(config Config, authenticate AuthHandler, identity IdentityHandler) J
 	return Jwt{config, authenticate, identity}
 }
 
-func Lol() int {
-	return 10
-}
-
 func NewConfig(secret string) Config {
 	return Config{
 		secret,
@@ -69,16 +67,22 @@ func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 
 		if err != nil {
 			// TODO: header empty or invalid
+			fmt.Println("header empty or invalid")
+			return nil
 		}
 
 		token, err := decodeToken(jwt.config.secret, tokenMethod, tokenString)
 
 		if err != nil {
 			// TODO: error token not valid
+			fmt.Println("error token not valid")
+			return nil
 		}
 
 		if getExpiredFromClaims(token.Claims, expiredKey) < time.Now().Unix() {
 			// TODO: error token expire
+			fmt.Println("error token expire")
+			return nil
 		}
 
 		c.Set(jwt.config.IdentityKey, jwt.identity(token.Claims[identityKey]))
@@ -88,6 +92,36 @@ func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 
 func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 	return func(c *echo.Context) error {
+		username := c.Form(jwt.config.UsernameField)
+		password := c.Form(jwt.config.PasswordField)
+
+		if username == "" || password == "" {
+			// TODO: has no required fields error\
+			fmt.Println("has no required fields error")
+			c.String(http.StatusOK, "has no required fields error")
+			return nil
+		}
+
+		val := jwt.authenticate(username, password)
+
+		if val == nil {
+			// TODO: auth error
+			fmt.Println("auth error")
+			c.String(http.StatusOK, "auth error")
+			return nil
+		}
+
+		token, err := encodeToken(jwt.config.secret, tokenMethod, jwt.config.JwtExpirationDelta, val)
+
+		if err != nil {
+			// TODO: error encode token
+			fmt.Println("error encode token")
+			c.String(http.StatusOK, "error encode token")
+			return nil
+		}
+
+		// TODO: call user callback response
+		c.String(http.StatusOK, token)
 		return nil
 	}
 }
