@@ -20,11 +20,12 @@ func defaultAuthErrorHandler(c *echo.Context) {
 	})
 }
 
-func defaultLoginResponseHandler(c *echo.Context, token string) {
+func defaultLoginResponseHandler(c *echo.Context, accessToken string, refreshToken string) {
 	c.JSON(http.StatusOK, map[string]interface{}{
 		"status": "Ok",
 		"response": map[string]interface{}{
-			"token": token,
+			"access_token":  accessToken,
+			"refresh_token": refreshToken,
 		},
 	})
 }

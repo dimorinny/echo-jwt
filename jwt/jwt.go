@@ -8,11 +8,17 @@ import (
 )
 
 const (
-	defaultExpDelta      = time.Hour * 100
-	defaultAuthPrefix    = "JWT"
-	defaultUsernameField = "username"
-	defaultPasswordField = "password"
-	defaultIdentityKey   = "identity"
+	defaultAccessExpDelta  = time.Hour * 100
+	defaultRefreshExpDelta = time.Hour * 100
+	defaultAuthPrefix      = "JWT"
+	defaultUsernameField   = "username"
+	defaultPasswordField   = "password"
+	defaultIdentityKey     = "identity"
+)
+
+const (
+	AccessToken = iota
+	RefreshToken
 )
 
 var (
@@ -23,15 +29,19 @@ type (
 	AuthHandler     func(login string, password string) interface{}
 	IdentityHandler func(identity interface{}) interface{}
 	ErrorHandler    func(c *echo.Context)
-	ResponseHandler func(c *echo.Context, token string)
+	ResponseHandler func(c *echo.Context, accessToken string, refreshToken string)
+
+	TokenType byte
 
 	Config struct {
-		secret             string
-		JwtExpirationDelta time.Duration
-		UsernameField      string
-		PasswordField      string
-		IdentityKey        string
-		AuthPrefix         string
+		secret        string
+		UsernameField string
+		PasswordField string
+		IdentityKey   string
+		AuthPrefix    string
+
+		AccessExpirationDelta  time.Duration
+		RefreshExpirationDelta time.Duration
 
 		HeaderInvalidHandler ErrorHandler
 		TokenInvalidHandler  ErrorHandler
@@ -56,11 +66,13 @@ func NewJwt(config Config, authenticate AuthHandler, identity IdentityHandler) J
 func NewConfig(secret string) Config {
 	return Config{
 		secret,
-		defaultExpDelta,
 		defaultUsernameField,
 		defaultPasswordField,
 		defaultIdentityKey,
 		defaultAuthPrefix,
+
+		defaultAccessExpDelta,
+		defaultRefreshExpDelta,
 
 		defaultHeaderInvalidHandler,
 		defaultTokenInvalidHandler,
@@ -86,7 +98,7 @@ func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 			return err
 		}
 
-		token, err := decodeToken(jwt.config.secret, tokenMethod, tokenString)
+		token, err := decodeToken(jwt.config.secret, tokenMethod, AccessToken, tokenString)
 
 		if err != nil {
 			jwt.config.TokenInvalidHandler(c)
@@ -120,13 +132,54 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 			return nil
 		}
 
-		token, err := encodeToken(jwt.config.secret, tokenMethod, jwt.config.JwtExpirationDelta, val)
+		accessToken, err := encodeToken(jwt.config.secret, tokenMethod,
+			jwt.config.AccessExpirationDelta, AccessToken, val)
+
+		refreshToken, err := encodeToken(jwt.config.secret, tokenMethod,
+			jwt.config.RefreshExpirationDelta, RefreshToken, val)
 
 		if err != nil {
 			return err
 		}
 
-		jwt.config.LoginResponseHandler(c, token)
+		jwt.config.LoginResponseHandler(c, accessToken, refreshToken)
+		return nil
+	}
+}
+
+func (jwt *Jwt) RefreshTokenHandler() echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		auth := c.Request().Header.Get(echo.Authorization)
+		tokenString, err := getAuthTokenFromHeader(auth, jwt.config.AuthPrefix)
+
+		if err != nil {
+			jwt.config.HeaderInvalidHandler(c)
+			return err
+		}
+
+		token, err := decodeToken(jwt.config.secret, tokenMethod, RefreshToken, tokenString)
+
+		if err != nil {
+			jwt.config.TokenInvalidHandler(c)
+			return err
+		}
+
+		if getExpiredFromClaims(token.Claims, expiredKey) < time.Now().Unix() {
+			jwt.config.TokenExpireHandler(c)
+			return err
+		}
+
+		accessToken, err := encodeToken(jwt.config.secret, tokenMethod,
+			jwt.config.AccessExpirationDelta, AccessToken, token.Claims[identityKey])
+
+		refreshToken, err := encodeToken(jwt.config.secret, tokenMethod,
+			jwt.config.RefreshExpirationDelta, RefreshToken, token.Claims[identityKey])
+
+		if err != nil {
+			return err
+		}
+
+		jwt.config.LoginResponseHandler(c, accessToken, refreshToken)
 		return nil
 	}
 }

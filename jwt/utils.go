@@ -8,6 +8,10 @@ func getExpiredFromClaims(claims map[string]interface{}, key string) int64 {
 	return int64(claims[key].(float64))
 }
 
+func getTokenTypeFromClaims(claims map[string]interface{}, key string) TokenType {
+	return TokenType(claims[key].(float64))
+}
+
 func getAuthTokenFromHeader(auth string, prefix string) (string, error) {
 	prefixLength := len(prefix)
 
