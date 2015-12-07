@@ -1,8 +1,6 @@
 package jwt
 
 import (
-	"fmt"
-	"net/http"
 	"time"
 
 	gojwt "github.com/dgrijalva/jwt-go"
@@ -24,6 +22,8 @@ var (
 type (
 	AuthHandler     func(login string, password string) interface{}
 	IdentityHandler func(identity interface{}) interface{}
+	ErrorHandler    func(c *echo.Context)
+	ResponseHandler func(c *echo.Context, token string)
 
 	Config struct {
 		secret             string
@@ -32,6 +32,14 @@ type (
 		PasswordField      string
 		IdentityKey        string
 		AuthPrefix         string
+
+		HeaderInvalidHandler ErrorHandler
+		TokenInvalidHandler  ErrorHandler
+		TokenExpireHandler   ErrorHandler
+
+		LoginNotRequiredFieldsHandler ErrorHandler
+		AuthErrorHandler              ErrorHandler
+		LoginResponseHandler          ResponseHandler
 	}
 
 	Jwt struct {
@@ -53,6 +61,14 @@ func NewConfig(secret string) Config {
 		defaultPasswordField,
 		defaultIdentityKey,
 		defaultAuthPrefix,
+
+		defaultHeaderInvalidHandler,
+		defaultTokenInvalidHandler,
+		defaultTokenExpireHandler,
+
+		defaultNotRequiredFieldsHandler,
+		defaultAuthErrorHandler,
+		defaultLoginResponseHandler,
 	}
 }
 
@@ -66,23 +82,20 @@ func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 		tokenString, err := getAuthTokenFromHeader(auth, jwt.config.AuthPrefix)
 
 		if err != nil {
-			// TODO: header empty or invalid
-			fmt.Println("header empty or invalid")
-			return nil
+			jwt.config.HeaderInvalidHandler(c)
+			return err
 		}
 
 		token, err := decodeToken(jwt.config.secret, tokenMethod, tokenString)
 
 		if err != nil {
-			// TODO: error token not valid
-			fmt.Println("error token not valid")
-			return nil
+			jwt.config.TokenInvalidHandler(c)
+			return err
 		}
 
 		if getExpiredFromClaims(token.Claims, expiredKey) < time.Now().Unix() {
-			// TODO: error token expire
-			fmt.Println("error token expire")
-			return nil
+			jwt.config.TokenExpireHandler(c)
+			return err
 		}
 
 		c.Set(jwt.config.IdentityKey, jwt.identity(token.Claims[identityKey]))
@@ -96,32 +109,24 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 		password := c.Form(jwt.config.PasswordField)
 
 		if username == "" || password == "" {
-			// TODO: has no required fields error\
-			fmt.Println("has no required fields error")
-			c.String(http.StatusOK, "has no required fields error")
+			jwt.config.LoginNotRequiredFieldsHandler(c)
 			return nil
 		}
 
 		val := jwt.authenticate(username, password)
 
 		if val == nil {
-			// TODO: auth error
-			fmt.Println("auth error")
-			c.String(http.StatusOK, "auth error")
+			jwt.config.AuthErrorHandler(c)
 			return nil
 		}
 
 		token, err := encodeToken(jwt.config.secret, tokenMethod, jwt.config.JwtExpirationDelta, val)
 
 		if err != nil {
-			// TODO: error encode token
-			fmt.Println("error encode token")
-			c.String(http.StatusOK, "error encode token")
-			return nil
+			return err
 		}
 
-		// TODO: call user callback response
-		c.String(http.StatusOK, token)
+		jwt.config.LoginResponseHandler(c, token)
 		return nil
 	}
 }
