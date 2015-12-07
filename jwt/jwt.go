@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultAccessExpDelta  = time.Hour * 100
+	defaultAccessExpDelta  = time.Hour * 10
 	defaultRefreshExpDelta = time.Hour * 100
 	defaultAuthPrefix      = "JWT"
 	defaultUsernameField   = "username"
@@ -84,6 +84,16 @@ func NewConfig(secret string) Config {
 	}
 }
 
+func (jwt *Jwt) GenerateAccessToken(identity interface{}) (string, error) {
+	return encodeToken(jwt.config.secret, tokenMethod,
+		jwt.config.AccessExpirationDelta, AccessToken, identity)
+}
+
+func (jwt *Jwt) GenerateRefreshToken(identity interface{}) (string, error) {
+	return encodeToken(jwt.config.secret, tokenMethod,
+		jwt.config.RefreshExpirationDelta, RefreshToken, identity)
+}
+
 func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		if (c.Request().Header.Get(echo.Upgrade)) == echo.WebSocket {
@@ -132,11 +142,8 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 			return nil
 		}
 
-		accessToken, err := encodeToken(jwt.config.secret, tokenMethod,
-			jwt.config.AccessExpirationDelta, AccessToken, val)
-
-		refreshToken, err := encodeToken(jwt.config.secret, tokenMethod,
-			jwt.config.RefreshExpirationDelta, RefreshToken, val)
+		accessToken, err := jwt.GenerateAccessToken(val)
+		refreshToken, err := jwt.GenerateRefreshToken(val)
 
 		if err != nil {
 			return err
@@ -169,11 +176,8 @@ func (jwt *Jwt) RefreshTokenHandler() echo.HandlerFunc {
 			return err
 		}
 
-		accessToken, err := encodeToken(jwt.config.secret, tokenMethod,
-			jwt.config.AccessExpirationDelta, AccessToken, token.Claims[identityKey])
-
-		refreshToken, err := encodeToken(jwt.config.secret, tokenMethod,
-			jwt.config.RefreshExpirationDelta, RefreshToken, token.Claims[identityKey])
+		accessToken, err := jwt.GenerateAccessToken(token.Claims[identityKey])
+		refreshToken, err := jwt.GenerateRefreshToken(token.Claims[identityKey])
 
 		if err != nil {
 			return err
