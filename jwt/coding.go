@@ -12,12 +12,8 @@ const (
 	expiredKey  = "Expired"
 )
 
-func encodeToken(
-	secret string,
-	alg gojwt.SigningMethod,
-	duration time.Duration,
-	identity interface{}) (string, error) {
-
+func encodeToken(secret string, alg gojwt.SigningMethod,
+	duration time.Duration, identity interface{}) (string, error) {
 	t := gojwt.New(alg)
 
 	t.Claims[identityKey] = identity
@@ -27,7 +23,6 @@ func encodeToken(
 }
 
 func decodeToken(secret string, alg gojwt.SigningMethod, tokenString string) (gojwt.Token, error) {
-
 	t, err := gojwt.Parse(tokenString, func(token *gojwt.Token) (interface{}, error) {
 		if ok := token.Method == alg; !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
