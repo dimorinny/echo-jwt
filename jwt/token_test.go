@@ -30,6 +30,8 @@ func TestTokenData(t *testing.T) {
 	assert.NoError(t, err)
 
 	token, err := Decode(testSecret, testMethod, tokenString)
+	assert.NoError(t, err)
+
 	assert.Equal(t, testToken, *token)
 }
 
@@ -45,6 +47,8 @@ func TestTokenDataError(t *testing.T) {
 	assert.NoError(t, err)
 
 	token, err := Decode(testSecret, testMethod, tokenString)
+	assert.NoError(t, err)
+
 	token.UnixTimestamp += 1
 	assert.NotEqual(t, testToken, *token)
 }
@@ -52,8 +56,11 @@ func TestTokenDataError(t *testing.T) {
 func TestExpired(t *testing.T) {
 	testToken := Token{testIdentity, time.Now().Unix() - 1, RefreshToken}
 
-	tokenString, _ := Encode(testSecret, testMethod, testToken)
-	token, _ := Decode(testSecret, testMethod, tokenString)
+	tokenString, err := Encode(testSecret, testMethod, testToken)
+	assert.NoError(t, err)
+
+	token, err := Decode(testSecret, testMethod, tokenString)
+	assert.NoError(t, err)
 
 	assert.True(t, token.IsExpired())
 }
