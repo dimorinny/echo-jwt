@@ -16,11 +16,6 @@ const (
 	defaultIdentityKey     = "identity"
 )
 
-const (
-	AccessToken = iota
-	RefreshToken
-)
-
 var (
 	tokenMethod = gojwt.SigningMethodHS256
 )
@@ -30,8 +25,6 @@ type (
 	IdentityHandler func(identity interface{}) interface{}
 	ErrorHandler    func(c *echo.Context)
 	ResponseHandler func(c *echo.Context, accessToken string, refreshToken string)
-
-	TokenType byte
 
 	Config struct {
 		secret        string
@@ -50,6 +43,7 @@ type (
 		LoginNotRequiredFieldsHandler ErrorHandler
 		AuthErrorHandler              ErrorHandler
 		LoginResponseHandler          ResponseHandler
+		RefreshResponseHandler        ResponseHandler
 	}
 
 	Jwt struct {
@@ -81,19 +75,31 @@ func NewConfig(secret string) Config {
 		defaultNotRequiredFieldsHandler,
 		defaultAuthErrorHandler,
 		defaultLoginResponseHandler,
+		defaultRefreshResponseHandler,
 	}
 }
 
+// Generate access token from identity.
+// Use this method for generating tokens in your handlers.
 func (jwt *Jwt) GenerateAccessToken(identity interface{}) (string, error) {
-	return encodeToken(jwt.config.secret, tokenMethod,
-		jwt.config.AccessExpirationDelta, AccessToken, identity)
+	return Encode(jwt.config.secret, tokenMethod,
+		Token{identity, time.Now().Add(jwt.config.AccessExpirationDelta).Unix(), AccessToken})
 }
 
+// Generate refresh token from identity.
+// Use this method for generating tokens in your handlers.
 func (jwt *Jwt) GenerateRefreshToken(identity interface{}) (string, error) {
-	return encodeToken(jwt.config.secret, tokenMethod,
-		jwt.config.RefreshExpirationDelta, RefreshToken, identity)
+	return Encode(jwt.config.secret, tokenMethod,
+		Token{identity, time.Now().Add(jwt.config.AccessExpirationDelta).Unix(), RefreshToken})
 }
 
+// Get token object from token string.
+// Use this method for parsing token object from token header in your custom handlers.
+func (jwt *Jwt) TokenFromString(tokenString string) (*Token, error) {
+	return Decode(jwt.config.secret, tokenMethod, tokenString)
+}
+
+// Auth required middleware.
 func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		if (c.Request().Header.Get(echo.Upgrade)) == echo.WebSocket {
@@ -108,23 +114,24 @@ func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 			return err
 		}
 
-		token, err := decodeToken(jwt.config.secret, tokenMethod, AccessToken, tokenString)
+		token, err := Decode(jwt.config.secret, tokenMethod, tokenString)
 
-		if err != nil {
+		if err != nil || token.Type != AccessToken {
 			jwt.config.TokenInvalidHandler(c)
 			return err
 		}
 
-		if getExpiredFromClaims(token.Claims, expiredKey) < time.Now().Unix() {
+		if token.IsExpired() {
 			jwt.config.TokenExpireHandler(c)
 			return err
 		}
 
-		c.Set(jwt.config.IdentityKey, jwt.identity(token.Claims[identityKey]))
+		c.Set(jwt.config.IdentityKey, jwt.identity(token.Identity))
 		return nil
 	}
 }
 
+// Login handler. Override authenticate function and return identity for user.
 func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		username := c.Form(jwt.config.UsernameField)
@@ -154,6 +161,8 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 	}
 }
 
+// Refresh token handler.
+// Use this handler for refreshing access and refresh tokens by old refresh token.
 func (jwt *Jwt) RefreshTokenHandler() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		auth := c.Request().Header.Get(echo.Authorization)
@@ -164,26 +173,26 @@ func (jwt *Jwt) RefreshTokenHandler() echo.HandlerFunc {
 			return err
 		}
 
-		token, err := decodeToken(jwt.config.secret, tokenMethod, RefreshToken, tokenString)
+		token, err := Decode(jwt.config.secret, tokenMethod, tokenString)
 
-		if err != nil {
+		if err != nil || token.Type != RefreshToken {
 			jwt.config.TokenInvalidHandler(c)
 			return err
 		}
 
-		if getExpiredFromClaims(token.Claims, expiredKey) < time.Now().Unix() {
+		if token.IsExpired() {
 			jwt.config.TokenExpireHandler(c)
 			return err
 		}
 
-		accessToken, err := jwt.GenerateAccessToken(token.Claims[identityKey])
-		refreshToken, err := jwt.GenerateRefreshToken(token.Claims[identityKey])
+		accessToken, err := jwt.GenerateAccessToken(token.Identity)
+		refreshToken, err := jwt.GenerateRefreshToken(token.Identity)
 
 		if err != nil {
 			return err
 		}
 
-		jwt.config.LoginResponseHandler(c, accessToken, refreshToken)
+		jwt.config.RefreshResponseHandler(c, accessToken, refreshToken)
 		return nil
 	}
 }
