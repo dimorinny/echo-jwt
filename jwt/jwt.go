@@ -90,7 +90,7 @@ func (jwt *Jwt) GenerateAccessToken(identity interface{}) (string, error) {
 // Use this method for generating tokens in your handlers.
 func (jwt *Jwt) GenerateRefreshToken(identity interface{}) (string, error) {
 	return Encode(jwt.config.secret, tokenMethod,
-		Token{identity, time.Now().Add(jwt.config.AccessExpirationDelta).Unix(), RefreshToken})
+		Token{identity, time.Now().Add(jwt.config.RefreshExpirationDelta).Unix(), RefreshToken})
 }
 
 // Get token object from token string.
