@@ -32,7 +32,7 @@ func defaultLoginResponseHandler(c *echo.Context, accessToken string, refreshTok
 
 func defaultRefreshResponseHandler(c *echo.Context, accessToken string, refreshToken string) {
 	c.JSON(http.StatusOK, map[string]interface{}{
-		"status": "Ok1",
+		"status": "Ok",
 		"response": map[string]interface{}{
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
