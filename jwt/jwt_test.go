@@ -1,8 +1,10 @@
 package jwt
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -16,7 +18,11 @@ const (
 )
 
 func testAuthenticateHandler(username string, password string) interface{} {
-	return "identity"
+	if username == "test" && password == "test" {
+		return "test"
+	}
+
+	return nil
 }
 
 func testIdentityHandler(identity interface{}) interface{} {
@@ -28,6 +34,10 @@ func testErrorHandler(code int, response string) ErrorHandler {
 		c.String(code, response)
 	}
 }
+
+// ====================================
+// ======== Test Token Methods ========
+// ====================================
 
 func TestAccessToken(t *testing.T) {
 	jwt := NewJwt(NewConfig(testJwtSecret), testAuthenticateHandler, testIdentityHandler)
@@ -62,6 +72,10 @@ func TestRefreshToken(t *testing.T) {
 	assert.Equal(t, token.Type, RefreshToken)
 	assert.Equal(t, token.UnixTimestamp, expTimestamp)
 }
+
+// =====================================
+// === Test Auth Required Middleware ===
+// =====================================
 
 func TestAuthRequiredInvalidToken(t *testing.T) {
 	response := "invalid token"
@@ -157,3 +171,99 @@ func TestAuthRequiredInvalidHeader(t *testing.T) {
 	assert.Equal(t, rec.Body.String(), response)
 	assert.Equal(t, rec.Code, status)
 }
+
+// =====================================
+// ========= Test Auth Handler =========
+// =====================================
+
+func TestAuthHandlerWithoutFields(t *testing.T) {
+	response := "without required fields"
+	status := http.StatusForbidden
+
+	e := echo.New()
+	config := NewConfig(testJwtSecret)
+	config.LoginNotRequiredFieldsHandler = testErrorHandler(status, response)
+
+	jwt := NewJwt(config, testAuthenticateHandler, testIdentityHandler)
+
+	req, _ := http.NewRequest(echo.GET, "/", nil)
+	rec := httptest.NewRecorder()
+
+	c := echo.NewContext(req, echo.NewResponse(rec, e), e)
+	handler := jwt.LoginHandler()
+
+	// Ececute
+	handler(c)
+	assert.Equal(t, rec.Body.String(), response)
+	assert.Equal(t, rec.Code, status)
+}
+
+func TestAuthHandlerInvalid(t *testing.T) {
+	response := "auth error"
+	status := http.StatusForbidden
+
+	e := echo.New()
+	config := NewConfig(testJwtSecret)
+	config.AuthErrorHandler = testErrorHandler(status, response)
+
+	jwt := NewJwt(config, testAuthenticateHandler, testIdentityHandler)
+
+	req, _ := http.NewRequest(echo.POST, "/", nil)
+	req.Form = url.Values{}
+	req.Form.Set(config.UsernameField, "invalid")
+	req.Form.Set(config.PasswordField, "invalid")
+
+	rec := httptest.NewRecorder()
+
+	c := echo.NewContext(req, echo.NewResponse(rec, e), e)
+	handler := jwt.LoginHandler()
+
+	// Ececute
+	handler(c)
+	assert.Equal(t, rec.Body.String(), response)
+	assert.Equal(t, rec.Code, status)
+}
+
+func TestAuthHandlerValid(t *testing.T) {
+	response := "auth error"
+	status := http.StatusForbidden
+
+	e := echo.New()
+	config := NewConfig(testJwtSecret)
+	config.AuthErrorHandler = testErrorHandler(status, response)
+
+	jwt := NewJwt(config, testAuthenticateHandler, testIdentityHandler)
+
+	req, _ := http.NewRequest(echo.POST, "/", nil)
+	req.Form = url.Values{}
+	req.Form.Set(config.UsernameField, "test")
+	req.Form.Set(config.PasswordField, "test")
+
+	rec := httptest.NewRecorder()
+
+	c := echo.NewContext(req, echo.NewResponse(rec, e), e)
+	handler := jwt.LoginHandler()
+
+	// Ececute
+	err := handler(c)
+	assert.NoError(t, err)
+
+	result := struct {
+		Status   string
+		Response struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+		}
+	}{}
+
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	assert.Equal(t, result.Status, "Ok")
+
+	token, _ := jwt.TokenFromString(result.Response.AccessToken)
+	assert.Equal(t, token.Identity, "test")
+	assert.False(t, token.IsExpired())
+}
+
+// =====================================
+// ======== Test Refresh Handler =======
+// =====================================
