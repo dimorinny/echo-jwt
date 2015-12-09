@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"errors"
 	"time"
 
 	gojwt "github.com/dgrijalva/jwt-go"
@@ -116,14 +117,19 @@ func (jwt *Jwt) AuthRequired() echo.HandlerFunc {
 
 		token, err := Decode(jwt.config.secret, tokenMethod, tokenString)
 
-		if err != nil || token.Type != AccessToken {
+		if err != nil {
 			jwt.config.TokenInvalidHandler(c)
 			return err
 		}
 
+		if token.Type != AccessToken {
+			jwt.config.TokenInvalidHandler(c)
+			return errors.New("Error token type")
+		}
+
 		if token.IsExpired() {
 			jwt.config.TokenExpireHandler(c)
-			return err
+			return errors.New("Token expired")
 		}
 
 		c.Set(jwt.config.IdentityKey, jwt.identity(token.Identity))
@@ -139,14 +145,14 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 
 		if username == "" || password == "" {
 			jwt.config.LoginNotRequiredFieldsHandler(c)
-			return nil
+			return errors.New("Has no required fields")
 		}
 
 		val := jwt.authenticate(username, password)
 
 		if val == nil {
 			jwt.config.AuthErrorHandler(c)
-			return nil
+			return errors.New("Auth error")
 		}
 
 		accessToken, err := jwt.GenerateAccessToken(val)
@@ -175,14 +181,19 @@ func (jwt *Jwt) RefreshTokenHandler() echo.HandlerFunc {
 
 		token, err := Decode(jwt.config.secret, tokenMethod, tokenString)
 
-		if err != nil || token.Type != RefreshToken {
+		if err != nil {
 			jwt.config.TokenInvalidHandler(c)
 			return err
 		}
 
+		if token.Type != RefreshToken {
+			jwt.config.TokenInvalidHandler(c)
+			return errors.New("Error token type")
+		}
+
 		if token.IsExpired() {
 			jwt.config.TokenExpireHandler(c)
-			return err
+			return errors.New("Token expired")
 		}
 
 		accessToken, err := jwt.GenerateAccessToken(token.Identity)
