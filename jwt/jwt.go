@@ -41,10 +41,9 @@ type (
 		TokenInvalidHandler  ErrorHandler
 		TokenExpireHandler   ErrorHandler
 
-		LoginNotRequiredFieldsHandler ErrorHandler
-		AuthErrorHandler              ErrorHandler
-		LoginResponseHandler          ResponseHandler
-		RefreshResponseHandler        ResponseHandler
+		AuthErrorHandler       ErrorHandler
+		LoginResponseHandler   ResponseHandler
+		RefreshResponseHandler ResponseHandler
 	}
 
 	Jwt struct {
@@ -73,7 +72,6 @@ func NewConfig(secret string) Config {
 		defaultTokenInvalidHandler,
 		defaultTokenExpireHandler,
 
-		defaultNotRequiredFieldsHandler,
 		defaultAuthErrorHandler,
 		defaultLoginResponseHandler,
 		defaultRefreshResponseHandler,
@@ -142,11 +140,6 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		username := c.Form(jwt.config.UsernameField)
 		password := c.Form(jwt.config.PasswordField)
-
-		if username == "" || password == "" {
-			jwt.config.LoginNotRequiredFieldsHandler(c)
-			return errors.New("Has no required fields")
-		}
 
 		val := jwt.authenticate(username, password)
 

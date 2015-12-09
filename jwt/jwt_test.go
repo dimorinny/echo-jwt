@@ -176,28 +176,6 @@ func TestAuthRequiredInvalidHeader(t *testing.T) {
 // ========= Test Auth Handler =========
 // =====================================
 
-func TestAuthHandlerWithoutFields(t *testing.T) {
-	response := "without required fields"
-	status := http.StatusForbidden
-
-	e := echo.New()
-	config := NewConfig(testJwtSecret)
-	config.LoginNotRequiredFieldsHandler = testErrorHandler(status, response)
-
-	jwt := NewJwt(config, testAuthenticateHandler, testIdentityHandler)
-
-	req, _ := http.NewRequest(echo.GET, "/", nil)
-	rec := httptest.NewRecorder()
-
-	c := echo.NewContext(req, echo.NewResponse(rec, e), e)
-	handler := jwt.LoginHandler()
-
-	// Ececute
-	handler(c)
-	assert.Equal(t, rec.Body.String(), response)
-	assert.Equal(t, rec.Code, status)
-}
-
 func TestAuthHandlerInvalid(t *testing.T) {
 	response := "auth error"
 	status := http.StatusForbidden

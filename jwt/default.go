@@ -6,13 +6,6 @@ import (
 	"github.com/labstack/echo"
 )
 
-func defaultNotRequiredFieldsHandler(c *echo.Context) {
-	c.JSON(http.StatusBadRequest, map[string]interface{}{
-		"status": "Error",
-		"error":  "Request has't required fields for authenticate",
-	})
-}
-
 func defaultAuthErrorHandler(c *echo.Context) {
 	c.JSON(http.StatusForbidden, map[string]interface{}{
 		"status": "Error",
