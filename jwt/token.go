@@ -58,7 +58,7 @@ func Decode(secret string, alg gojwt.SigningMethod, tokenString string) (*Token,
 
 func decodeToken(secret string, alg gojwt.SigningMethod, tokenString string) (*gojwt.Token, error) {
 	t, err := gojwt.Parse(tokenString, func(token *gojwt.Token) (interface{}, error) {
-		if ok := token.Method == alg; !ok {
+		if token.Method != alg {
 			return nil, errors.New("Unexpected signing method")
 		}
 		return []byte(secret), nil
