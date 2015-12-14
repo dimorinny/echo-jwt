@@ -23,6 +23,8 @@ _testmain.go
 *.test
 *.prof
 
-# OS X
+# idea
+.idea
 
+# OS X
 .DS_Store
