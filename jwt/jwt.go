@@ -25,7 +25,7 @@ type (
 	AuthHandler     func(login string, password string) interface{}
 	IdentityHandler func(identity interface{}) interface{}
 	ErrorHandler    func(c *echo.Context)
-	ResponseHandler func(c *echo.Context, accessToken string, refreshToken string)
+	ResponseHandler func(c *echo.Context, identity interface{}, accessToken string, refreshToken string)
 
 	Config struct {
 		secret        string
@@ -155,7 +155,7 @@ func (jwt *Jwt) LoginHandler() echo.HandlerFunc {
 			return err
 		}
 
-		jwt.config.LoginResponseHandler(c, accessToken, refreshToken)
+		jwt.config.LoginResponseHandler(c, val, accessToken, refreshToken)
 		return nil
 	}
 }
@@ -196,7 +196,7 @@ func (jwt *Jwt) RefreshTokenHandler() echo.HandlerFunc {
 			return err
 		}
 
-		jwt.config.RefreshResponseHandler(c, accessToken, refreshToken)
+		jwt.config.RefreshResponseHandler(c, token.Identity, accessToken, refreshToken)
 		return nil
 	}
 }

@@ -59,7 +59,7 @@ func main() {
 	// Customize login field in login handler
 	config.UsernameField = "email"
 	// Customize success login response
-	config.LoginResponseHandler = func(c *echo.Context, accessToken string, refreshToken string) {
+	config.LoginResponseHandler = func(c *echo.Context, identity interface{}, accessToken string, refreshToken string) {
 		c.JSON(http.StatusOK, map[string]interface{}{
 			"custom": "Yes",
 			"status": "Ok",
