@@ -49,7 +49,7 @@ func TestTokenDataError(t *testing.T) {
 	token, err := Decode(testSecret, testMethod, tokenString)
 	assert.NoError(t, err)
 
-	token.UnixTimestamp += 1
+	token.UnixTimestamp++
 	assert.NotEqual(t, testToken, *token)
 }
 

@@ -17,7 +17,7 @@ func getAuthTokenFromHeader(auth string, prefix string) (string, error) {
 
 	if len(auth) > prefixLength+1 && auth[:prefixLength] == prefix {
 		return auth[prefixLength+1:], nil
-	} else {
-		return "", errors.New("Error while parsing token")
 	}
+
+	return "", errors.New("Error while parsing token")
 }
